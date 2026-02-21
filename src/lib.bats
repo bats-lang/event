@@ -23,12 +23,11 @@
 
 implement listen{lb}{n}
   (node_id, event_type, type_len, listener_id, callback) = let
-  val cbp = $UNSAFE begin $UNSAFE.castvwtp0{ptr}(callback) end
-  val () = $B.listener_set(listener_id, cbp)
+  val () = $B.listener_set_closure(listener_id, callback)
 in $B.listen(node_id, event_type, type_len, listener_id) end
 
 implement unlisten(listener_id) = let
-  val () = $B.listener_set(listener_id, the_null_ptr)
+  val () = $B.listener_clear(listener_id)
 in $B.unlisten(listener_id) end
 
 implement prevent_default() = $B.prevent_default()
