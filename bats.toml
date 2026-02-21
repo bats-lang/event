@@ -1,3 +1,4 @@
 [package]
 name = "wasm.bats-packages.dev/event"
 kind = "lib"
+unsafe = true
