@@ -1,3 +1,8 @@
 [package]
 name = "wasm.bats-packages.dev/event"
 kind = "lib"
+
+[dependencies]
+"wasm.bats-packages.dev/bridge" = ""
+"array" = ""
+"arith" = ""

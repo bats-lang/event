@@ -6,8 +6,8 @@
 #use wasm.bats-packages.dev/bridge as B
 
 #pub fun listen
-  {lb:agz}{n:pos}
-  (node_id: int,
+  {li:agz}{ni:pos}{lb:agz}{n:pos}
+  (node_id: !$A.borrow(byte, li, ni), id_len: int ni,
    event_type: !$A.borrow(byte, lb, n), type_len: int n,
    listener_id: int,
    callback: (int) -<cloref1> int): void
@@ -21,14 +21,11 @@
   {n:pos | n <= 1048576}
   (len: int n): [l:agz] $A.arr(byte, l, n)
 
-implement listen{lb}{n}
-  (node_id, event_type, type_len, listener_id, callback) = let
-  val () = $B.listener_set_closure(listener_id, callback)
-in $B.listen(node_id, event_type, type_len, listener_id) end
+implement listen{li}{ni}{lb}{n}
+  (node_id, id_len, event_type, type_len, listener_id, callback) =
+  $B.listen(node_id, id_len, event_type, type_len, listener_id, callback)
 
-implement unlisten(listener_id) = let
-  val () = $B.listener_clear(listener_id)
-in $B.unlisten(listener_id) end
+implement unlisten(listener_id) = $B.unlisten(listener_id)
 
 implement prevent_default() = $B.prevent_default()
 
@@ -89,12 +86,13 @@ end
 
 (* ============================================================
    Click/pointer event helpers
-   Payload format: [f64 LE clientX:8][f64 LE clientY:8][i32 LE targetId:4]
-   Total: 20 bytes
-   Returns @(x, y, target_node_id) with x/y as integers.
+   Payload format: [f64 LE clientX:8][f64 LE clientY:8][u16 LE targetIdLen:2]
+   Total: 18 bytes
+   The target ID string is in stash slot 2.
+   Returns @(x, y, target_id_len) with x/y as integers.
    ============================================================ *)
 
-#pub fn click_payload {l:agz}{n:pos | n >= 20}
+#pub fn click_payload {l:agz}{n:pos | n >= 18}
   (payload: !$A.arr(byte, l, n), payload_len: int n): @(int, int, int)
 
 (* Extract integer from IEEE 754 float64 LE at offset.
@@ -120,19 +118,16 @@ in
   end
 end
 
-fn _i32_le {l:agz}{n:pos}
+fn _u16_le {l:agz}{n:pos}
   (arr: !$A.arr(byte, l, n), off: int, max: int n): int = let
   val b0 = byte2int0($A.get<byte>(arr, $AR.checked_idx(off, max)))
   val b1 = byte2int0($A.get<byte>(arr, $AR.checked_idx(off + 1, max)))
-  val b2 = byte2int0($A.get<byte>(arr, $AR.checked_idx(off + 2, max)))
-  val b3 = byte2int0($A.get<byte>(arr, $AR.checked_idx(off + 3, max)))
 in
-  $AR.bor_int_int($AR.bor_int_int(b0, $AR.bsl_int_int(b1, 8)),
-                  $AR.bor_int_int($AR.bsl_int_int(b2, 16), $AR.bsl_int_int(b3, 24)))
+  $AR.bor_int_int(b0, $AR.bsl_int_int(b1, 8))
 end
 
 implement click_payload {l}{n} (payload, payload_len) = let
   val x = _f64_to_int(payload, 0, payload_len)
   val y = _f64_to_int(payload, 8, payload_len)
-  val target = _i32_le(payload, 16, payload_len)
-in @(x, y, target) end
+  val target_id_len = _u16_le(payload, 16, payload_len)
+in @(x, y, target_id_len) end
