@@ -86,3 +86,53 @@ in
   if mod_off >= payload_len then 0
   else byte2int0($A.get<byte>(payload, $AR.checked_idx(mod_off, payload_len)))
 end
+
+(* ============================================================
+   Click/pointer event helpers
+   Payload format: [f64 LE clientX:8][f64 LE clientY:8][i32 LE targetId:4]
+   Total: 20 bytes
+   Returns @(x, y, target_node_id) with x/y as integers.
+   ============================================================ *)
+
+#pub fn click_payload {l:agz}{n:pos | n >= 20}
+  (payload: !$A.arr(byte, l, n), payload_len: int n): @(int, int, int)
+
+(* Extract integer from IEEE 754 float64 LE at offset.
+   Handles positive values 0..4096 which covers pixel coordinates. *)
+fn _f64_to_int {l:agz}{n:pos}
+  (arr: !$A.arr(byte, l, n), off: int, max: int n): int = let
+  val b5 = byte2int0($A.get<byte>(arr, $AR.checked_idx(off + 5, max)))
+  val b6 = byte2int0($A.get<byte>(arr, $AR.checked_idx(off + 6, max)))
+  val b7 = byte2int0($A.get<byte>(arr, $AR.checked_idx(off + 7, max)))
+  val exp_raw = $AR.bor_int_int($AR.bsl_int_int($AR.band_int_int(b7, 127), 4),
+                                $AR.bsr_int_int(b6, 4))
+in
+  if $AR.eq_int_int(exp_raw, 0) then 0
+  else let
+    val exp = exp_raw - 1023
+  in
+    if exp < 0 then 0
+    else if exp > 12 then 4096
+    else let
+      val mant_high = $AR.bor_int_int($AR.bsl_int_int($AR.band_int_int(b6, 15), 8), b5)
+      val top13 = $AR.bor_int_int($AR.bsl_int_int(1, 12), mant_high)
+    in $AR.bsr_int_int(top13, 12 - exp) end
+  end
+end
+
+fn _i32_le {l:agz}{n:pos}
+  (arr: !$A.arr(byte, l, n), off: int, max: int n): int = let
+  val b0 = byte2int0($A.get<byte>(arr, $AR.checked_idx(off, max)))
+  val b1 = byte2int0($A.get<byte>(arr, $AR.checked_idx(off + 1, max)))
+  val b2 = byte2int0($A.get<byte>(arr, $AR.checked_idx(off + 2, max)))
+  val b3 = byte2int0($A.get<byte>(arr, $AR.checked_idx(off + 3, max)))
+in
+  $AR.bor_int_int($AR.bor_int_int(b0, $AR.bsl_int_int(b1, 8)),
+                  $AR.bor_int_int($AR.bsl_int_int(b2, 16), $AR.bsl_int_int(b3, 24)))
+end
+
+implement click_payload {l}{n} (payload, payload_len) = let
+  val x = _f64_to_int(payload, 0, payload_len)
+  val y = _f64_to_int(payload, 8, payload_len)
+  val target = _i32_le(payload, 16, payload_len)
+in @(x, y, target) end
