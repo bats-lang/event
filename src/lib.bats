@@ -5,6 +5,9 @@
 #use array as A
 #use wasm.bats-packages.dev/bridge as B
 
+staload BE = "wasm.bats-packages.dev/bridge/src/event.sats"
+staload BS = "wasm.bats-packages.dev/bridge/src/stash.sats"
+
 #pub fun listen
   {li:agz}{ni:pos}{lb:agz}{n:pos}
   (node_id: !$A.borrow(byte, li, ni), id_len: int ni,
@@ -23,14 +26,14 @@
 
 implement listen{li}{ni}{lb}{n}
   (node_id, id_len, event_type, type_len, listener_id, callback) =
-  $B.listen(node_id, id_len, event_type, type_len, listener_id, callback)
+  $BE.listen(node_id, id_len, event_type, type_len, listener_id, callback)
 
-implement unlisten(listener_id) = $B.unlisten(listener_id)
+implement unlisten(listener_id) = $BE.unlisten(listener_id)
 
-implement prevent_default() = $B.prevent_default()
+implement prevent_default() = $BE.prevent_default()
 
 implement get_payload{n}(len) =
-  $B.stash_read($B.stash_get_int(1), len)
+  $BS.stash_read($BS.stash_get_int(1), len)
 
 (* ============================================================
    Keyboard event helpers
